@@ -53,6 +53,9 @@ function applyOptionShuffle(item: QuestionItem): QuestionItem {
 }
 
 export function buildQuestionGroups(questions: LibraryQuestion[], words: Record<string, WordEntry>): QuestionItem[][] {
+  const meaningBySense = new Map(
+    Object.values(words).flatMap((word) => word.senses.map((sense) => [sense.id, sense.meaningZh] as const)),
+  );
   return questions.map((question): QuestionItem[] => {
     if (question.kind === "reading") {
       return question.questions.map((child): QuestionItem => {
@@ -65,7 +68,7 @@ export function buildQuestionGroups(questions: LibraryQuestion[], words: Record<
           senseId: child.senseId,
           type: "reading",
           difficulty: question.difficulty,
-          meaning: findMeaning(words, child.senseId),
+          meaning: meaningBySense.get(child.senseId) ?? "",
         };
         return applyOptionShuffle(base);
       });
@@ -79,7 +82,7 @@ export function buildQuestionGroups(questions: LibraryQuestion[], words: Record<
       senseId: question.senseId,
       type: question.questionStyle,
       difficulty: question.difficulty,
-      meaning: findMeaning(words, question.senseId),
+      meaning: meaningBySense.get(question.senseId) ?? "",
     };
     return [applyOptionShuffle(base)];
   });
@@ -179,8 +182,4 @@ export function buildWrongContent(
       };
     }),
   }, null, 2);
-}
-
-function findMeaning(words: Record<string, WordEntry>, senseId: string) {
-  return Object.values(words).flatMap((word) => word.senses).find((sense) => sense.id === senseId)?.meaningZh ?? "";
 }

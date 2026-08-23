@@ -20,12 +20,13 @@ import { LiquidNav, type LiquidNavItem } from "@/components/liquid-nav";
 import { BrandLockup } from "@/components/ui/brand";
 import { cn } from "@/lib/cn";
 import { SyncIndicator } from "@/components/sync-indicator";
+import { useUIStore } from "@/stores/ui-store";
 
 const destinations = [
   { href: "/", label: "nav.study", icon: Brain },
   { href: "/library", label: "nav.library", icon: LibraryBig },
   {
-    href: "/practice?mode=questions",
+    href: "/practice",
     activePathPrefix: "/practice",
     label: "nav.practice",
     icon: ClipboardCheck,
@@ -61,7 +62,8 @@ function RouteTransition({
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [scrolled, setScrolled] = React.useState(false);
-  const showMobileNavigation = !isSecondaryMobileRoute(pathname);
+  const practiceActive = useUIStore((store) => store.practiceActive);
+  const showMobileNavigation = !practiceActive && !isSecondaryMobileRoute(pathname);
 
   React.useEffect(() => commitRouteHistory(pathname), [pathname]);
 
@@ -91,8 +93,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <div className="min-h-[100dvh] bg-[var(--surface-stage)] md:grid md:grid-cols-[15rem_minmax(0,1fr)]">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r bg-background/92 p-3 backdrop-blur-xl md:flex">
+    <div
+      className={cn(
+        "app-shell min-h-[100dvh] bg-[var(--surface-stage)]",
+        !practiceActive && "md:grid md:grid-cols-[15rem_minmax(0,1fr)]",
+      )}
+      data-focus={practiceActive}
+    >
+      {!practiceActive && <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r bg-background/92 p-3 backdrop-blur-xl md:flex">
         <div className="flex items-center justify-between px-2 pb-5 pt-2">
           <BrandLockup href="/" />
           <SyncIndicator />
@@ -115,9 +123,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <UserRound className="size-[1.125rem]" />
           {t("nav.me")}
         </Link>
-      </aside>
+      </aside>}
 
-      <div className="min-w-0 md:col-start-2">
+      <div className={cn("min-w-0", !practiceActive && "md:col-start-2")}>
         <div aria-hidden className="app-top-blur" data-visible={scrolled} />
         <main
           className={`app-viewport pt-[max(1rem,var(--safe-top))] md:pb-12 md:pt-6 ${
@@ -127,7 +135,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           }`}
         >
           {showMobileNavigation && (
-            <div className="mb-4 flex h-10 items-center justify-between md:hidden">
+            <div className="app-mobile-header mb-4 flex h-10 items-center justify-between md:hidden">
               <BrandLockup
                 href="/"
                 markClassName="size-9 rounded-lg p-2"

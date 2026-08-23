@@ -23,6 +23,7 @@ export function SyncIndicator() {
   const pending = useCloudStore((store) => store.pending);
   const sync = useCloudStore((store) => store.sync);
   const isWorking = ["connecting", "syncing", "preparing", "downloading", "reconciling", "uploading", "retrying", "verifying"].includes(status);
+  const showPending = ready && pending;
   const Icon = !configured || status === "signed-out" ? CloudOff : status === "error" ? AlertCircle : isWorking ? LoaderCircle : status === "synced" && !pending ? Check : Cloud;
 
   return (
@@ -37,10 +38,10 @@ export function SyncIndicator() {
           variant="ghost"
         >
           <Icon className={isWorking ? "animate-spin" : undefined} />
-          {pending && <span className="absolute right-1 top-1 size-1.5 rounded-full bg-warning" />}
+          {showPending && <span className="absolute right-1 top-1 size-1.5 rounded-full bg-warning" />}
         </Button>
       </TooltipTrigger>
-      <TooltipContent>{statusCopy(status)}{pending ? ` · ${t("settings.syncPending")}` : ""}</TooltipContent>
+      <TooltipContent>{statusCopy(status)}{showPending ? ` · ${t("settings.syncPending")}` : ""}</TooltipContent>
     </Tooltip>
   );
 }

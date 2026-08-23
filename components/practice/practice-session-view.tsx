@@ -57,7 +57,7 @@ export function PracticeSessionView({
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-4 flex items-center justify-between text-sm text-muted-foreground">
-        <button type="button" onClick={onLeave} className="rounded-lg px-1 py-1 transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40">
+        <button type="button" onClick={onLeave} className="-my-2 inline-flex min-h-11 items-center rounded-lg px-2 transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40">
           {t("common.back")}
         </button>
         <span className="tabular-nums">{t("practice.progress", { current: index + 1, total })}</span>
@@ -76,11 +76,11 @@ export function PracticeSessionView({
         ) : question ? (
           <>
             <div className="mt-4 flex justify-end gap-1">
-              <Button size="sm" variant={marked ? "secondary" : "ghost"} onClick={onToggleMark}>
+              <Button className="min-h-11 sm:min-h-9" size="sm" variant={marked ? "secondary" : "ghost"} onClick={onToggleMark}>
                 <Bookmark className="size-4" />{t("practice.mark")}
               </Button>
               {selected === null && (
-                <Button size="sm" variant="ghost" disabled={busy} onClick={onSkip}>
+                <Button className="min-h-11 sm:min-h-9" size="sm" variant="ghost" disabled={busy} onClick={onSkip}>
                   <SkipForward className="size-4" />{t("practice.skip")}
                 </Button>
               )}
@@ -171,7 +171,7 @@ function ReviewCard({ item, revealed, busy, typing, onReveal, onRate }: { item: 
       <section className="rounded-2xl bg-muted/70 px-5 py-9 text-center sm:px-8 sm:py-11">
         {showWord && (
           <>
-            <button type="button" aria-label={t("practice.speak")} onClick={speak} className="mx-auto mb-5 grid size-10 place-items-center rounded-full bg-card text-primary shadow-[var(--shadow-control)] transition-transform duration-150 active:scale-[.94]">
+            <button type="button" aria-label={t("practice.speak")} onClick={speak} className="mx-auto mb-5 grid size-11 place-items-center rounded-full bg-card text-primary shadow-[var(--shadow-control)] transition-transform duration-150 active:scale-[.94] focus-visible:ring-2 focus-visible:ring-ring/40">
               <Volume2 className="size-4" />
             </button>
             <h1 className="text-2xl font-semibold tracking-[-0.025em] sm:text-3xl">{item.word}</h1>
@@ -224,13 +224,13 @@ function ReviewCard({ item, revealed, busy, typing, onReveal, onRate }: { item: 
             <p className="text-lg font-semibold tracking-[-0.01em]">{item.meaning}</p>
             {item.example && <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-muted-foreground">{item.example}</p>}
             <div className="mx-auto mt-8 grid max-w-sm grid-cols-2 gap-2">
-              <Button variant="secondary" disabled={busy} onClick={() => onRate("again")}>{t("practice.again")}</Button>
-              <Button disabled={busy} onClick={() => onRate("good")}>{busy ? t("practice.recording") : t("practice.good")}</Button>
+              <Button size="lg" variant="secondary" disabled={busy} onClick={() => onRate("again")}>{t("practice.again")}</Button>
+              <Button size="lg" disabled={busy} onClick={() => onRate("good")}>{busy ? t("practice.recording") : t("practice.good")}</Button>
             </div>
             {!reduceMotion && <p className="mt-3 text-xs text-muted-foreground">{t("practice.swipeHint")}</p>}
           </motion.div>
         ) : (
-          <Button className="mt-9" onClick={onReveal}>{t("practice.reveal")}</Button>
+          <Button className="mt-9" size="lg" onClick={onReveal}>{t("practice.reveal")}</Button>
         )}
       </section>
     </motion.div>
@@ -286,7 +286,7 @@ function QuestionCard({ item, selected, busy, last, onAnswer, onNext }: { item: 
           {selected !== item.answerIndex && <p className="mt-2 text-sm text-foreground">{t("practice.answer", { answer: item.options[item.answerIndex] ?? "" })}</p>}
           {item.meaning && <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.meaning}</p>}
           <div className="mt-5 flex justify-end">
-            <Button className="w-full sm:w-auto" disabled={busy} onClick={onNext}>
+            <Button className="w-full sm:w-auto" size="lg" disabled={busy} onClick={onNext}>
               {busy ? t("practice.recording") : t(last ? "practice.viewResult" : "practice.next")}
             </Button>
           </div>

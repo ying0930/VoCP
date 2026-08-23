@@ -14,7 +14,7 @@ import { t } from "@/lib/i18n";
 import { useLearningStore } from "@/stores/learning-store";
 import { useLibraryStore } from "@/stores/library-store";
 import { ALL_FOLDER_ID, buildFolderOptions, UNCATEGORIZED_FOLDER_ID } from "@/src/lib/folders";
-import { isDue } from "@/src/lib/fsrs";
+import { buildLibrarySetMetrics } from "@/src/lib/library-metrics";
 import { buildQuestionId } from "@/src/lib/library";
 import { readSetShare } from "@/src/lib/set-share";
 import { createUniqueSetName } from "@/src/lib/set-name";
@@ -28,6 +28,10 @@ export function LibraryPage({ initialFolderId }: { initialFolderId?: string }) {
   const saveSet = useLibraryStore((store) => store.saveSet);
   const saveQuestion = useLibraryStore((store) => store.saveQuestion);
   const cards = useLearningStore((store) => store.progress.cards);
+  const setMetrics = useMemo(
+    () => buildLibrarySetMetrics(state, cards),
+    [cards, state],
+  );
   const [query, setQuery] = useState("");
   const [currentFolderId, setCurrentFolderId] = useState(initialFolderId ?? ALL_FOLDER_ID);
   const [newFolder, setNewFolder] = useState("");
@@ -130,12 +134,8 @@ export function LibraryPage({ initialFolderId }: { initialFolderId?: string }) {
         {status === "error" && <Status text={t("library.migrationError", { message: error ?? "" })} />}
         {status === "ready" && !query.trim() && childFolders.map((folder) => <FolderRow key={folder.id} folder={folder} itemCount={countDirectItems(state.folders, state.sets, folder.id)} onOpen={() => openFolder(folder.id)} />)}
         {status === "ready" && sets.map((entry) => {
-          const memberships = state.memberships[entry.id] ?? [];
-          const senseIds = memberships.flatMap((membership) => membership.senseIds);
-          const learned = senseIds.filter((senseId) => cards[senseId]).length;
-          const due = senseIds.filter((senseId) => cards[senseId] && isDue(cards[senseId])).length;
-          const questionCount = state.questions.filter((question) => question.kind === "reading" ? question.questions.some((child) => memberships.some((member) => member.wordKey === child.wordKey && member.senseIds.includes(child.senseId))) : memberships.some((member) => member.wordKey === question.wordKey && member.senseIds.includes(question.senseId))).length;
-          return <SetRow key={entry.id} id={entry.id} name={entry.setName} senseCount={senseIds.length} learned={learned} due={due} questionCount={questionCount} />;
+          const metrics = setMetrics.get(entry.id) ?? { senseCount: 0, learned: 0, due: 0, questionCount: 0 };
+          return <SetRow key={entry.id} id={entry.id} name={entry.setName} {...metrics} />;
         })}
         {empty && <EmptyLocation searching={Boolean(query.trim())} createHref={currentFolder ? `/sets/new?folderId=${encodeURIComponent(currentFolder.id)}` : "/sets/new"} />}
       </section>

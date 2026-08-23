@@ -1,10 +1,10 @@
 :root {
   --motion-micro: 80ms;
-  --motion-quick: 150ms;
-  --motion-fast: 250ms;
-  --motion-medium: 350ms;
-  --motion-slow: 400ms;
-  --motion-emphasis: 500ms;
+  --motion-quick: 120ms;
+  --motion-fast: 200ms;
+  --motion-medium: 260ms;
+  --motion-slow: 320ms;
+  --motion-emphasis: 400ms;
   --motion-stagger: 40ms;
   --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
@@ -42,15 +42,13 @@
 
 /* Animate only the newly committed route node; no old-page snapshot or exit layer. */
 .t-route-enter {
-  animation:
-    t-route-enter-child var(--motion-medium) var(--ease-smooth-out) backwards,
-    t-route-blur var(--motion-quick) var(--ease-smooth-out) backwards;
+  animation: t-route-enter-child var(--motion-medium) var(--ease-smooth-out) backwards;
 }
 
 @keyframes t-route-enter-child {
   from {
     opacity: 0.9;
-    transform: translateX(24px);
+    transform: translateX(var(--motion-distance-sm));
   }
   to {
     opacity: 1;
@@ -71,19 +69,14 @@
   }
 }
 
-@keyframes t-route-blur {
-  from { filter: blur(var(--motion-blur-sm)); }
-  to { filter: blur(0); }
-}
-
 .t-route-enter[data-route-direction="back"] {
-  animation-name: t-route-enter-back, t-route-blur;
+  animation-name: t-route-enter-back;
 }
 
 @keyframes t-route-enter-back {
   from {
     opacity: 0.9;
-    transform: translateX(-24px);
+    transform: translateX(calc(-1 * var(--motion-distance-sm)));
   }
   to {
     opacity: 1;

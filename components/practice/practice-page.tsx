@@ -1,41 +1,37 @@
 "use client";
 
-import type { ReviewRating, StudyWord, WorkspacePracticeMode, WorkspaceQuestionDifficulty, WorkspaceQuestionType } from "@/types";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
+import type { PracticeSessionSnapshot, StudyWord, WorkspacePracticeMode, WorkspaceQuestionDifficulty, WorkspaceQuestionType } from "@/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   buildQuestionGroups,
   buildWrongContent,
   type QuestionItem,
   selectQuestionItems,
-  shuffleSession,
 } from "@/components/practice/practice-content";
 import { ResultPanel } from "@/components/practice/result-panel";
 import { PracticeSessionView } from "@/components/practice/practice-session-view";
 import { PracticeSetup } from "@/components/practice/practice-setup";
 import { usePracticeKeyboard } from "@/components/practice/use-practice-keyboard";
-import { PRACTICE_PREFERENCES_STORAGE_KEY, PRACTICE_SESSION_STORAGE_KEY } from "@/constants";
+import { usePersistPracticeSession, usePracticePreferences, useRestorePracticeSession } from "@/components/practice/use-practice-persistence";
+import { usePracticeSessionActions } from "@/components/practice/use-practice-session-actions";
 import { t } from "@/lib/i18n";
 import { useLearningStore } from "@/stores/learning-store";
 import { useLibraryStore } from "@/stores/library-store";
-import { isSameLocalDay } from "@/src/lib/date";
+import { useUIStore } from "@/stores/ui-store";
 import { isDue, isLeech } from "@/src/lib/fsrs";
 import { senseToStudyWord } from "@/src/lib/library";
-import { canRestorePracticeSession, parsePracticeSession } from "@/src/lib/practice-session";
 
 type Mode = WorkspacePracticeMode;
 type QuestionType = WorkspaceQuestionType;
 type Difficulty = WorkspaceQuestionDifficulty;
 
-export function PracticePage({ initialMode = "review", initialSet = "" }: { initialMode?: Mode; initialSet?: string }) {
+export function PracticePage({ initialMode = "review", initialSet = "", initialAutoStart = false }: { initialMode?: Mode; initialSet?: string; initialAutoStart?: boolean }) {
   const state = useLibraryStore((store) => store.state);
   const libraryStatus = useLibraryStore((store) => store.status);
   const progress = useLearningStore((store) => store.progress);
   const learningLoaded = useLearningStore((store) => store.loaded);
-  const rateSense = useLearningStore((store) => store.rateSense);
-  const scheduleSenseFromQuestion = useLearningStore((store) => store.scheduleSenseFromQuestion);
-  const recordQuestion = useLearningStore((store) => store.recordQuestion);
+  const setPracticeActive = useUIStore((store) => store.setPracticeActive);
 
   const [mode, setMode] = useState<Mode>(initialMode);
   const [setId, setSetId] = useState(initialSet);
@@ -57,11 +53,9 @@ export function PracticePage({ initialMode = "review", initialSet = "" }: { init
   const [retrying, setRetrying] = useState(false);
   const [questionFailedSenses, setQuestionFailedSenses] = useState<string[]>([]);
   const [answerChoices, setAnswerChoices] = useState<Array<number | null>>([]);
-  const [actionBusy, setActionBusy] = useState(false);
-  const [animateNextCard, setAnimateNextCard] = useState(true);
   const restoreAttempted = useRef(false);
   const sessionRestored = useRef(false);
-  const actionPending = useRef(false);
+  const autoStartAttempted = useRef(false);
 
   const allowedSenseIds = useMemo(
     () => new Set((setId ? state.memberships[setId] ?? [] : Object.values(state.memberships).flat()).flatMap((entry) => entry.senseIds)),
@@ -90,6 +84,7 @@ export function PracticePage({ initialMode = "review", initialSet = "" }: { init
     () => selectQuestionItems(allQuestionGroups, allowedSenseIds, amount, questionType, difficulty),
     [allQuestionGroups, allowedSenseIds, amount, difficulty, questionType],
   );
+  const setIds = useMemo(() => new Set(state.sets.map((entry) => entry.id)), [state.sets]);
 
   const activeReviews = started ? sessionReviews ?? [] : reviewItems;
   const activeQuestions = started ? sessionQuestions ?? [] : questionItems;
@@ -101,25 +96,11 @@ export function PracticePage({ initialMode = "review", initialSet = "" }: { init
   const wrongContent = buildWrongContent(mode, wrong, activeReviews, activeQuestions, answerChoices);
 
   useEffect(() => {
-    if (restoreAttempted.current || libraryStatus !== "ready" || !learningLoaded) return;
-    restoreAttempted.current = true;
-    const raw = localStorage.getItem(PRACTICE_SESSION_STORAGE_KEY);
-    const saved = parsePracticeSession(raw);
-    if (!saved) {
-      if (raw) localStorage.removeItem(PRACTICE_SESSION_STORAGE_KEY);
-      return;
-    }
-    if (!canRestorePracticeSession(saved, initialMode, initialSet)) return;
-    const allowed = new Set((saved.setId ? state.memberships[saved.setId] ?? [] : Object.values(state.memberships).flat()).flatMap((entry) => entry.senseIds));
-    const sourceItems = saved.mode === "review" ? allStudyItems : allQuestionItems;
-    const byId = new Map(sourceItems.map((item) => [item.id, item]));
-    const items = saved.itemIds.map((id) => byId.get(id));
-    const invalidItems = items.some((item) => !item || !allowed.has(saved.mode === "review" ? (item as StudyWord).id : (item as QuestionItem).senseId));
-    if ((saved.setId && !state.sets.some((entry) => entry.id === saved.setId)) || invalidItems) {
-      localStorage.removeItem(PRACTICE_SESSION_STORAGE_KEY);
-      return;
-    }
-    sessionRestored.current = true;
+    setPracticeActive(started && !complete);
+    return () => setPracticeActive(false);
+  }, [complete, setPracticeActive, started]);
+
+  const restoreSession = useCallback((saved: PracticeSessionSnapshot, items: Array<QuestionItem | StudyWord>) => {
     setMode(saved.mode);
     setSetId(saved.setId);
     setAmount(saved.amount);
@@ -138,207 +119,92 @@ export function PracticePage({ initialMode = "review", initialSet = "" }: { init
     if (saved.mode === "review") setSessionReviews(items as StudyWord[]);
     else setSessionQuestions(items as QuestionItem[]);
     setStarted(true);
-  }, [allQuestionItems, allStudyItems, initialMode, initialSet, learningLoaded, libraryStatus, state.memberships, state.sets]);
+  }, []);
+
+  useRestorePracticeSession({
+    allQuestionItems,
+    allStudyItems,
+    enabled: libraryStatus === "ready" && learningLoaded,
+    initialMode,
+    initialSet,
+    memberships: state.memberships,
+    restoreAttempted,
+    sessionRestored,
+    setIds,
+    onRestore: restoreSession,
+  });
+
+  usePracticePreferences({
+    initialSet,
+    learningLoaded,
+    started: started || sessionRestored.current,
+    values: { setId, amount, questionType, difficulty, leechOnly, typingMode },
+    setAmount,
+    setDifficulty,
+    setLeechOnly,
+    setQuestionType,
+    setSetId,
+    setTypingMode,
+  });
+  usePersistPracticeSession({
+    activeItems: mode === "review" ? activeReviews : activeQuestions,
+    amount,
+    answerChoices,
+    complete,
+    correct,
+    difficulty,
+    failedSenseIds: questionFailedSenses,
+    index,
+    marked,
+    mode,
+    questionType,
+    retrying,
+    revealed,
+    selected,
+    setId,
+    skipped,
+    started,
+    wrong,
+  });
+
+  const actions = usePracticeSessionActions({
+    activeQuestions,
+    activeReviews,
+    index,
+    mode,
+    progressCards: progress.cards,
+    questionFailedSenses,
+    questionItems,
+    retrying,
+    reviewItems,
+    selected,
+    setters: { setAnswerChoices, setCorrect, setIndex, setMarked, setMode, setQuestionFailedSenses, setRetrying, setRevealed, setSelected, setSessionQuestions, setSessionReviews, setSkipped, setStarted, setWrong },
+  });
 
   useEffect(() => {
-    if (!learningLoaded || started || sessionRestored.current) return;
-    try {
-      const saved = JSON.parse(localStorage.getItem(PRACTICE_PREFERENCES_STORAGE_KEY) ?? "{}") as {
-        setId?: string;
-        amount?: number;
-        questionType?: QuestionType;
-        difficulty?: Difficulty;
-        leechOnly?: boolean;
-        typingMode?: boolean;
-      };
-      if (!initialSet && saved.setId) setSetId(saved.setId);
-      if (saved.amount) setAmount(saved.amount);
-      if (saved.questionType) setQuestionType(saved.questionType);
-      if (saved.difficulty) setDifficulty(saved.difficulty);
-      if (typeof saved.leechOnly === "boolean") setLeechOnly(saved.leechOnly);
-      if (typeof saved.typingMode === "boolean") setTypingMode(saved.typingMode);
-    } catch {
-      // Defaults remain usable when preferences were corrupted.
-    }
-  }, [initialSet, learningLoaded, started]);
-
-  useEffect(() => {
-    if (started) return;
-    localStorage.setItem(PRACTICE_PREFERENCES_STORAGE_KEY, JSON.stringify({ setId, amount, questionType, difficulty, leechOnly, typingMode }));
-  }, [amount, difficulty, leechOnly, questionType, setId, started, typingMode]);
-
-  useEffect(() => {
-    if (!started) return;
-    if (complete) {
-      localStorage.removeItem(PRACTICE_SESSION_STORAGE_KEY);
-      return;
-    }
-    const itemIds = (mode === "review" ? activeReviews : activeQuestions).map((item) => item.id);
-    if (!itemIds.length) return;
-    localStorage.setItem(PRACTICE_SESSION_STORAGE_KEY, JSON.stringify({
-      schemaVersion: 1,
-      mode,
-      setId,
-      amount,
-      index,
-      correct,
-      wrong,
-      skipped,
-      marked,
-      selected,
-      revealed,
-      questionType,
-      difficulty,
-      itemIds,
-      failedSenseIds: questionFailedSenses,
-      retrying,
-      answerChoices: mode === "questions" ? activeQuestions.map((_, position) => answerChoices[position] ?? null) : [],
-    }));
-  }, [activeQuestions, activeReviews, amount, answerChoices, complete, correct, difficulty, index, marked, mode, questionFailedSenses, questionType, retrying, revealed, selected, setId, skipped, started, wrong]);
-
-  const resetAttempt = () => {
-    actionPending.current = false;
-    setActionBusy(false);
-    setIndex(0);
-    setCorrect(0);
-    setWrong([]);
-    setSkipped([]);
-    setMarked([]);
-    setSelected(null);
-    setRevealed(false);
-    setAnswerChoices([]);
-  };
-  const advance = (fromKeyboard = false) => {
-    setAnimateNextCard(!fromKeyboard);
-    setIndex((value) => value + 1);
-    setRevealed(false);
-    setSelected(null);
-  };
-  const next = (fromKeyboard = false) => {
-    if (actionPending.current) return;
-    advance(fromKeyboard);
-  };
-  const rate = async (rating: ReviewRating, fromKeyboard = false) => {
-    const item = activeReviews[index];
-    if (!item || actionPending.current) return;
-    actionPending.current = true;
-    setActionBusy(true);
-    try {
-      await rateSense(item.id, rating);
-      if (rating === "good") setCorrect((value) => value + 1);
-      else setWrong((value) => [...value, index]);
-      advance(fromKeyboard);
-    } catch (reason) {
-      console.error(reason);
-      toast.error(t("practice.recordFailed"));
-    } finally {
-      actionPending.current = false;
-      setActionBusy(false);
-    }
-  };
-  const answer = async (choice: number) => {
-    if (selected !== null || actionPending.current) return;
-    const item = activeQuestions[index];
-    if (!item) return;
-    actionPending.current = true;
-    setActionBusy(true);
-    const isCorrect = choice === item.answerIndex;
-    setSelected(choice);
-    setRevealed(true);
-    setAnswerChoices((values) => {
-      const next = [...values];
-      while (next.length <= index) next.push(null);
-      next[index] = choice;
-      return next;
-    });
-    if (isCorrect) setCorrect((value) => value + 1);
-    else setWrong((value) => [...value, index]);
-    const addedFailedSense = !isCorrect && !questionFailedSenses.includes(item.senseId);
-    if (addedFailedSense) setQuestionFailedSenses((values) => [...values, item.senseId]);
-    try {
-      const card = progress.cards[item.senseId];
-      const reviewedToday = card?.lastReview ? isSameLocalDay(new Date(card.lastReview), new Date()) : false;
-      if (addedFailedSense) {
-        await scheduleSenseFromQuestion(item.senseId, "again");
-      } else if (isCorrect && !reviewedToday) {
-        await scheduleSenseFromQuestion(item.senseId, "good");
-      }
-      await recordQuestion(item.senseId, item.type, item.difficulty, isCorrect, retrying);
-    } catch (reason) {
-      console.error(reason);
-      toast.error(t("practice.recordFailed"));
-      setSelected(null);
-      setRevealed(false);
-      if (isCorrect) setCorrect((value) => Math.max(0, value - 1));
-      else setWrong((value) => value.filter((value2) => value2 !== index));
-      if (addedFailedSense) setQuestionFailedSenses((values) => values.filter((id) => id !== item.senseId));
-    } finally {
-      actionPending.current = false;
-      setActionBusy(false);
-    }
-  };
-  const skip = async () => {
-    const item = activeQuestions[index];
-    if (!item || selected !== null || actionPending.current) return;
-    actionPending.current = true;
-    setActionBusy(true);
-    try {
-      setSkipped((values) => [...values, index]);
-      setWrong((values) => [...values, index]);
-      await recordQuestion(item.senseId, item.type, item.difficulty, false, retrying);
-      advance();
-    } catch (reason) {
-      console.error(reason);
-      toast.error(t("practice.recordFailed"));
-      setSkipped((values) => values.filter((value) => value !== index));
-      setWrong((values) => values.filter((value) => value !== index));
-    } finally {
-      actionPending.current = false;
-      setActionBusy(false);
-    }
-  };
-  const begin = () => {
-    if (mode === "review") {
-      setSessionReviews(shuffleSession(reviewItems));
-      setSessionQuestions(null);
-    } else {
-      setSessionQuestions(shuffleSession(questionItems));
-      setSessionReviews(null);
-    }
-    setRetrying(false);
-    setQuestionFailedSenses([]);
-    setAnimateNextCard(true);
-    resetAttempt();
-    setStarted(true);
-  };
-  const leave = () => {
-    localStorage.removeItem(PRACTICE_SESSION_STORAGE_KEY);
-    setStarted(false);
-    setSessionReviews(null);
-    setSessionQuestions(null);
-    setRetrying(false);
-    setQuestionFailedSenses([]);
-    resetAttempt();
-  };
-  const retry = (indices: number[]) => {
-    if (mode === "review") setSessionReviews(indices.map((value) => activeReviews[value]).filter(Boolean));
-    else setSessionQuestions(indices.map((value) => activeQuestions[value]).filter(Boolean));
-    setRetrying(true);
-    setQuestionFailedSenses([]);
-    setAnimateNextCard(true);
-    resetAttempt();
-  };
-
+    if (
+      !initialAutoStart
+      || autoStartAttempted.current
+      || sessionRestored.current
+      || !restoreAttempted.current
+      || libraryStatus !== "ready"
+      || !learningLoaded
+      || started
+    ) return;
+    autoStartAttempted.current = true;
+    const available = mode === "review" ? reviewItems.length : questionItems.length;
+    if (available) actions.begin();
+  }, [initialAutoStart, learningLoaded, libraryStatus, mode, questionItems.length, reviewItems.length, started]);
   usePracticeKeyboard({
     enabled: started && !complete,
     mode,
     revealed,
     selected,
-    busy: actionBusy,
+    busy: actions.actionBusy,
     onReveal: () => setRevealed(true),
-    onRate: (rating) => void rate(rating, true),
-    onAnswer: (choice) => void answer(choice),
-    onNext: () => next(true),
+    onRate: (rating) => void actions.rate(rating, true),
+    onAnswer: (choice) => void actions.answer(choice),
+    onNext: () => actions.next(true),
   });
 
   if (libraryStatus !== "ready" || !learningLoaded) {
@@ -365,7 +231,7 @@ export function PracticePage({ initialMode = "review", initialSet = "" }: { init
         onDifficultyChange={setDifficulty}
         onLeechOnlyChange={setLeechOnly}
         onTypingModeChange={setTypingMode}
-        onBegin={begin}
+        onBegin={actions.begin}
       />
     );
   }
@@ -378,17 +244,9 @@ export function PracticePage({ initialMode = "review", initialSet = "" }: { init
         skipped={skipped.length}
         marked={marked.length}
         wrongContent={wrongContent}
-        onRetry={() => retry(wrong)}
-        onRetryMarked={marked.length ? () => retry(marked) : undefined}
-        onContinueQuestions={mode === "review" && questionItems.length ? () => {
-          setMode("questions");
-          setSessionReviews(null);
-          setSessionQuestions(shuffleSession(questionItems));
-          setRetrying(false);
-          setQuestionFailedSenses([]);
-          setAnimateNextCard(true);
-          resetAttempt();
-        } : undefined}
+        onRetry={() => actions.retry(wrong)}
+        onRetryMarked={marked.length ? () => actions.retry(marked) : undefined}
+        onContinueQuestions={mode === "review" && questionItems.length ? actions.continueQuestions : undefined}
       />
     );
   }
@@ -404,16 +262,16 @@ export function PracticePage({ initialMode = "review", initialSet = "" }: { init
       revealed={revealed}
       selected={selected}
       marked={marked.includes(index)}
-      busy={actionBusy}
-      animateCard={animateNextCard}
+      busy={actions.actionBusy}
+      animateCard={actions.animateNextCard}
       typing={mode === "review" && typingMode}
-      onLeave={leave}
+      onLeave={actions.leave}
       onReveal={() => setRevealed(true)}
-      onRate={(rating) => void rate(rating)}
+      onRate={(rating) => void actions.rate(rating)}
       onToggleMark={() => setMarked((values) => values.includes(index) ? values.filter((value) => value !== index) : [...values, index])}
-      onSkip={() => void skip()}
-      onAnswer={(choice) => void answer(choice)}
-      onNext={() => next()}
+      onSkip={() => void actions.skip()}
+      onAnswer={(choice) => void actions.answer(choice)}
+      onNext={() => actions.next()}
     />
   );
 }

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-const CORE_ROUTES = ["/", "/practice?mode=questions", "/library", "/questions/generate"];
+const CORE_ROUTES = ["/", "/practice", "/library", "/questions/generate"];
 
 export function AppPreload() {
   const router = useRouter();
@@ -20,12 +20,5 @@ export function AppPreload() {
     return () => clearTimeout(id);
   }, [router]);
 
-  return (
-    <link
-      rel="preload"
-      as="image"
-      href="/illustrations/open-doodles-reading.svg"
-      fetchPriority="high"
-    />
-  );
+  return null;
 }

@@ -2,7 +2,7 @@
 
 import { ArrowRight, BookMarked, Play } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { PRACTICE_SESSION_STORAGE_KEY } from "@/constants";
@@ -15,7 +15,20 @@ export function LearningRows() {
   const state = useLibraryStore((store) => store.state);
   const [session, setSession] = useState<PracticeSessionSnapshot | null>(null);
   useEffect(() => { setSession(parsePracticeSession(localStorage.getItem(PRACTICE_SESSION_STORAGE_KEY))); }, []);
-  const recentSets = [...state.sets].sort((a,b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0,3).map((entry) => ({ id: entry.id, name: entry.setName, count: (state.memberships[entry.id] ?? []).reduce((sum, item) => sum + item.senseIds.length, 0), due: 0 }));
+  const recentSets = useMemo(
+    () => state.sets
+      .toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, 3)
+      .map((entry) => ({
+        id: entry.id,
+        name: entry.setName,
+        count: (state.memberships[entry.id] ?? []).reduce(
+          (sum, item) => sum + item.senseIds.length,
+          0,
+        ),
+      })),
+    [state.memberships, state.sets],
+  );
   return (
     <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(18.75rem,0.8fr)] lg:gap-10">
       {session && <section>
@@ -26,7 +39,7 @@ export function LearningRows() {
             <div className="truncate font-semibold">{state.sets.find((entry) => entry.id === session.setId)?.setName ?? t("practice.allSets")}</div>
             <div className="mt-1 text-sm text-muted-foreground">{session.index} / {session.itemIds.length}</div>
           </div>
-          <div className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-border sm:block"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, session.index / session.itemIds.length * 100)}%` }} /></div>
+          <div className="hidden h-1.5 w-24 overflow-hidden rounded-full bg-border sm:block"><div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, session.itemIds.length ? session.index / session.itemIds.length * 100 : 0)}%` }} /></div>
           <Button asChild variant="ghost" size="sm"><Link href="/practice">{t("home.resumeAction")}<ArrowRight className="size-4" /></Link></Button>
         </div>
       </section>}
@@ -44,7 +57,6 @@ export function LearningRows() {
                 <div className="truncate text-sm font-semibold group-hover:text-foreground">{set.name}</div>
                 <div className="mt-0.5 text-xs text-muted-foreground">{t("home.wordCount", { count: set.count })}</div>
               </div>
-              {set.due > 0 && <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-foreground">{set.due} {t("home.dueToday")}</span>}
             </Link>
           ))}
         </div>

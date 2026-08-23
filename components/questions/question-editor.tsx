@@ -4,7 +4,7 @@ import type { LibraryQuestion, MultipleChoiceQuestion } from "@/types";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 
 import { PageHeader } from "@/components/page-header";
@@ -19,7 +19,10 @@ export function QuestionEditor({ questionId }: { questionId?: string }) {
   const router = useRouter();
   const { state, saveQuestion } = useLibraryStore();
   const current = questionId ? state.questions.find((entry) => entry.id === questionId) : undefined;
-  const senses = Object.values(state.words).flatMap((word) => word.senses.map((sense) => ({ value: `${word.wordKey}::${sense.id}`, label: `${word.word} · ${sense.pos} ${sense.meaningZh}` })));
+  const senses = useMemo(
+    () => Object.values(state.words).flatMap((word) => word.senses.map((sense) => ({ value: `${word.wordKey}::${sense.id}`, label: `${word.word} · ${sense.pos} ${sense.meaningZh}` }))),
+    [state.words],
+  );
   const form = useForm<Values>({ defaultValues: { questionStyle: "standard", difficulty: 1, source: senses[0]?.value ?? "", prompt: "", option0: "", option1: "", option2: "", option3: "", answerIndex: 0, explanation: "" } });
 
   useEffect(() => {

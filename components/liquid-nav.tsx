@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { cn } from "@/lib/cn";
+import { t } from "@/lib/i18n";
 import { markRouteDirection } from "@/lib/navigation-memory";
 
 export interface LiquidNavItem {
@@ -60,7 +61,7 @@ export function LiquidNav({
 
   return (
     <nav
-      aria-label="Primary navigation"
+      aria-label={t("common.primaryNavigation")}
       className={cn(
         "relative isolate",
         vertical ? "grid gap-1" : "flex items-stretch",

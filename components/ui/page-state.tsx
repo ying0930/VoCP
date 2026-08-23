@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/cn";
+import { t } from "@/lib/i18n";
 
 export function PageHeader({
   actions,
@@ -46,7 +47,7 @@ export function PageHeader({
 
 export function LoadingState({ rows = 5 }: { rows?: number }) {
   return (
-    <div className="grid gap-2" aria-busy="true" aria-label="Loading">
+    <div className="grid gap-2" aria-busy="true" aria-label={t("common.loading")}>
       {Array.from({ length: rows }, (_, index) => (
         <Card className="t-skeleton gap-3 p-4" key={index}>
           <div className="flex items-center justify-between gap-3">
@@ -101,14 +102,14 @@ export function ErrorState({
         <AlertCircle className="size-5" />
       </div>
       <div>
-        <h2 className="font-semibold">載入失敗</h2>
+        <h2 className="font-semibold">{t("common.loadFailed")}</h2>
         <p className="mt-1 max-w-lg text-sm leading-6 text-muted-foreground">
           {error}
         </p>
       </div>
       {onRetry ? (
         <Button variant="outline" onClick={onRetry}>
-          <RefreshCw />重新載入</Button>
+          <RefreshCw />{t("common.reload")}</Button>
       ) : null}
     </Card>
   );

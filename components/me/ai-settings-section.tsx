@@ -1,6 +1,7 @@
 "use client";
 
-import { Bot, Download, Upload } from "lucide-react";
+import { Bot, Download, Eye, EyeOff, Upload } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { MeField, MeSection } from "@/components/me/me-section";
@@ -37,6 +38,7 @@ export function AiSettingsSection({
   settings: AiSettings;
   onChange: (settings: AiSettings) => void;
 }) {
+  const [showApiKey, setShowApiKey] = useState(false);
   const update = (patch: Partial<AiSettings>) =>
     onChange({ ...settings, ...patch });
 
@@ -88,64 +90,79 @@ export function AiSettingsSection({
           />
         </div>
 
-        <MeField label={t("settings.provider")}>
-          <Select
-            value={settings.provider}
-            onValueChange={(provider) =>
-              update({ provider: provider as AiProvider })
-            }
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {providers.map((provider) => (
-                <SelectItem key={provider.value} value={provider.value}>
-                  {provider.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </MeField>
-        <MeField label={t("settings.model")}>
-          <Input
-            value={settings.model}
-            onChange={(event) => update({ model: event.target.value })}
-          />
-        </MeField>
-        <MeField
-          label={t("settings.endpoint")}
-          description={t("me.endpointHint")}
-        >
-          <Input
-            inputMode="url"
-            value={settings.baseUrl}
-            placeholder={t("me.endpointPlaceholder")}
-            onChange={(event) => update({ baseUrl: event.target.value })}
-          />
-        </MeField>
-        <MeField label={t("settings.apiKey")}>
-          <Input
-            type="password"
-            autoComplete="off"
-            value={settings.apiKey}
-            onChange={(event) => update({ apiKey: event.target.value })}
-          />
-        </MeField>
-        <MeField
-          label={t("settings.batchSize")}
-          description={t("me.batchSizeHint")}
-        >
-          <Input
-            type="number"
-            min={5}
-            max={20}
-            value={settings.batchSize}
-            onChange={(event) =>
-              update({ batchSize: Number(event.target.value) })
-            }
-          />
-        </MeField>
+        {settings.enabled && (
+          <div className="t-panel-reveal grid gap-5">
+            <MeField label={t("settings.provider")}>
+              <Select
+                value={settings.provider}
+                onValueChange={(provider) =>
+                  update({ provider: provider as AiProvider })
+                }
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {providers.map((provider) => (
+                    <SelectItem key={provider.value} value={provider.value}>
+                      {provider.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </MeField>
+            <MeField label={t("settings.model")}>
+              <Input
+                value={settings.model}
+                onChange={(event) => update({ model: event.target.value })}
+              />
+            </MeField>
+            <MeField
+              label={t("settings.endpoint")}
+              description={t("me.endpointHint")}
+            >
+              <Input
+                inputMode="url"
+                value={settings.baseUrl}
+                placeholder={t("me.endpointPlaceholder")}
+                onChange={(event) => update({ baseUrl: event.target.value })}
+              />
+            </MeField>
+            <MeField label={t("settings.apiKey")}>
+              <div className="relative">
+                <Input
+                  className="pr-12"
+                  type={showApiKey ? "text" : "password"}
+                  autoComplete="off"
+                  value={settings.apiKey}
+                  onChange={(event) => update({ apiKey: event.target.value })}
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 grid w-11 place-items-center rounded-r-xl text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
+                  aria-label={t(showApiKey ? "me.hideApiKey" : "me.showApiKey")}
+                  onClick={() => setShowApiKey((visible) => !visible)}
+                >
+                  {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
+            </MeField>
+            <MeField
+              label={t("settings.batchSize")}
+              description={t("me.batchSizeHint")}
+            >
+              <Input
+                type="number"
+                min={5}
+                max={20}
+                value={settings.batchSize}
+                onChange={(event) =>
+                  update({ batchSize: Number(event.target.value) })
+                }
+              />
+            </MeField>
+          </div>
+        )}
 
         <div className="flex flex-wrap justify-end gap-2">
           <Button

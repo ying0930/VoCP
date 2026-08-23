@@ -124,13 +124,20 @@
 
 * {
   border-color: var(--border);
-  scrollbar-width: none;
+  scrollbar-color: var(--input) transparent;
+  scrollbar-width: thin;
 }
 
 *::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
+  width: 0.625rem;
+  height: 0.625rem;
+}
+
+*::-webkit-scrollbar-thumb {
+  border: 0.1875rem solid transparent;
+  border-radius: 999px;
+  background: var(--input);
+  background-clip: padding-box;
 }
 
 html {
@@ -399,6 +406,9 @@ textarea {
 @media (min-width: 48rem) {
   .app-top-blur {
     left: 15rem;
+  }
+  .app-shell[data-focus="true"] .app-top-blur {
+    left: 0;
   }
 }
 
